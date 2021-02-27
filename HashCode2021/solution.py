@@ -1,20 +1,34 @@
-from problem import *
 from tqdm import tqdm
-def trivial_sol(instance):
-    
-    streets = instance[2]
-    id2name = instance[1][1]
 
-    sol = []
-    for inter in tqdm(range(instance[0][1])):
-        end_street = filter(lambda x: x[1] == inter, streets)
-        s = [inter,tuple(map(lambda x: (x[-1],1),end_street))]
+import numpy as np
 
-        sol.append(s)
+from problem import *
 
-    return sol
+def trivial_sol(instance, processed_instance):
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
+
+    # Get necessary processed values
+    streets_in = processed_instance["streets_in"]
+
+    # Create solution
+    sol_ids = []
+    sol_scheds = []
+    for inter in tqdm(range(n_nodes)):
+        end_street = streets_in[inter]
+        
+        sched = (end_street,np.ones_like(end_street))
+
+        sol_ids.append(inter)
+        sol_scheds.append(sched)
+
+    return sol_ids, sol_scheds
 
 if __name__ == "__main__":
-    ri = read_instance()
-    sol = trivial_sol(ri)
-    write_solution(ri,sol)
+    inst = read_instance()
+    pro_inst = process_instance(inst)
+    sol = trivial_sol(inst, pro_inst)
+    write_solution(inst,sol)
