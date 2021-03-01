@@ -1,6 +1,7 @@
 import sys
 
 import itertools as itools
+import heapq
 
 import numpy as np
 
@@ -35,7 +36,7 @@ def read_instance(stream=sys.stdin):
     cars = []
     for _ in range(n_cars):
         rl = stream.readline().split()
-        c = np.array(map(lambda x: name2id[x], rl[1:]))
+        c = np.array(tuple(map(lambda x: name2id[x], rl[1:])))
         cars.append(c)
 
     return problem, streets, cars, meta
@@ -68,7 +69,9 @@ def write_solution(instance, solution, stream=sys.stdout):
             stream.write(str(street_sched))
             stream.write("\n")
 
-## Instance processing
+# Instance processing
+## Preprocessing
+### No dependencies
 def streets_in(instance):
     # Unpack instance
     problem, streets, cars, meta = instance
@@ -82,37 +85,88 @@ def streets_in(instance):
 
     return list(map(np.array,st_in))
 
+def cars_in_street(instance):
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
+
+    cis = list(map(lambda x: list(),streets_start))
+    for i, car in enumerate(cars):
+        for s in car:
+            cis[s].append(i)
+
+    return list(map(np.array,cis))
+
+def car_times(instance):
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
+
+    return list(map(lambda x: streets_time[x],cars))
+
+### Self dependencies
+def car_count_street(instance,p_instance):
+    cis = p_instance["cars_in_street"]
+    return np.array(tuple(map(len,cis)))
+
+def cum_car_times(instance,p_instance):
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
+
+    ct = p_instance["car_times"]
+
+    return list(map(lambda x: np.cumsum(x),ct))        
+
+### Instance preprocessing frontend
 def process_instance(instance):
     processed_instance = dict()
 
     processed_instance["streets_in"] = streets_in(instance)
+    processed_instance["cars_in_street"] = cars_in_street(instance)
+    processed_instance["car_times"] = car_times(instance)
+
+    processed_instance["car_count_street"] = car_count_street(instance,processed_instance)
+    processed_instance["cum_car_times"] = cum_car_times(instance,processed_instance)
 
     return processed_instance
 
+## In the loop processing
+def traffics(instance,p_instance,street):
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
+
+    cis = p_instance["cars_in_street"][street]
+    cct = p_instance["cum_car_times"][cis]
+    
+
+    traf = np.zeros((len(streets_start),sim_duration))
+    for tt, car in zip(cct,cars):
+        for ts,te,s in zip(tt[:-1],tt[1:],car[1:]):
+            ts, te = ts - tt[0], min(te - tt[0], sim_duration-1)
+            traf[s,ts] += 1
+            traf[s,te] -= 1
+
+    return np.cumsum(traf,axis=1)
 
 ## Evaluate solution
 def score(instance, solution):
-    sim_duration, n_nodes , bonus = instance[0]
-    streets, cars= instance[-2:]
+    # Unpack instance
+    problem, streets, cars, meta = instance
+    sim_duration, n_nodes, bonus = problem
+    streets_start, streets_end, streets_time = streets
+    id2name = meta
 
-    car_position = [(0,0)]*len(cars)
-
-    for day in range(sim_duration):
-        for car_i in range(len(cars)):
-            car = cars[car_i]
-            car_pos= car_position[car_i]
-            
-            # Has finished route
-            if car_pos[1] == len(car): continue
-
-            current_street_i = car[car_pos[1]]
-            current_street = streets[current_street_i]
-
-            # Is at the end of the road
-            end_of_road = car_pos[1] == 0 or (day - car_pos[0] >= 0)
-
-
-
+    
 
 if __name__ == "__main__":
     ri = read_instance()
